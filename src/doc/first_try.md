@@ -43,7 +43,7 @@ Result:
 ```
 Totally stamped 10
 ```
-### Let's up the game - add a worker
+#### Let's up the game - add a worker
 Ok - since we only want one worker, this shouldn't be too hard, should it?
 So we start out with high spirit:
 _worker.rs_
@@ -88,7 +88,7 @@ This code crashes because the extraction of the total from sc is not valid, sinc
 ```Rust
     let mut w1=Worker::new(sc);
 ```
-### Ok, let's try to borrow the sc to the worker
+#### Ok, let's try to borrow the sc to the worker
 We change the types of the StampingClocks variables to support borrowing:
 worker.rs:
 ```Rust
@@ -131,7 +131,7 @@ fn main() {
 And as such, the error is sort of fixed (sc.total() is executable - since it is not moved in the construction of the worker)
 
 But the worker does not compile - no lifetime...
-### Ok - let's add the _'static_ lifetime
+#### Ok - let's add the _'static_ lifetime
 Worker.rs changed to this:
 ```Rust
 use crate::stamping_clock::StampingClock;
@@ -203,4 +203,77 @@ fn main() {
 We finally got a working application, but it has a bitter taste.
 ```
 Totally stamped 25
+```
+
+Adding a bit decency back - but still totally unsafe these are the three files (Using Option<> for making it decent)
+
+main.rs
+```Rust
+mod worker;
+mod stamping_clock;
+use crate::stamping_clock::StampingClock;
+use crate::worker::Worker;
+static mut SC :Option<StampingClock> = None;
+
+fn main() {
+    unsafe {
+        SC=Some(StampingClock::new());
+        let mut w1=Worker::new(&mut SC);
+        let mut w2=Worker::new(&mut SC);
+        w1.stamp(10);
+        w1.stamp(5);
+        w2.stamp(10);
+        match &SC {
+            Some(sc) => println!("Totally stamped {}",sc.total()),
+            None => ()
+        }
+    }
+}
+```
+
+worker.rs
+```Rust
+use crate::stamping_clock::StampingClock;
+
+pub struct Worker {
+    pub stamping_clock: &'static mut Option<StampingClock>,
+}
+
+impl Worker {
+    pub fn new(stamping_clock: &'static mut Option<StampingClock>) -> Worker {
+        Worker {
+            stamping_clock: stamping_clock
+        }
+    }
+
+    pub fn stamp(&mut self, hours :u32) {
+        match self.stamping_clock {
+            Some(sc) => sc.stamp(hours),
+            None => ()
+        }
+    }
+}
+```
+
+and stamping_clock.rs
+```Rust
+pub struct StampingClock {
+    total :u32
+}
+
+impl StampingClock {
+    pub fn new() -> StampingClock {
+        StampingClock {
+            total: 0
+        }
+    }
+
+    pub fn stamp(&mut self, hours :u32) {
+        self.total+=hours;
+    }
+
+    pub fn total(&self) -> u32 {
+        self.total
+    }
+}
 ```
