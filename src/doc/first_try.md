@@ -1,17 +1,17 @@
 ### The challenge
 So, my first encounter with Rust is brutal. As soon as I have learned my first baby steps, and try to walk, I fall down.
 
-I want to create the easiest application that lets two worker objects use the same "stamping machine" to count the total number of worked hours.
+I want to create the easiest application that lets two worker objects use the same "punch machine" to count the total number of worked hours.
 #### Let's get rolling
-_stamping_clock.rs_
+_punch_clock.rs_
 ```Rust
-pub struct StampingClock {
+pub struct PunchClock {
     total :u32
 }
 
-impl StampingClock {
-    pub fn new() -> StampingClock {
-        StampingClock {
+impl PunchClock {
+    pub fn new() -> PunchClock {
+        PunchClock {
             total: 0
         }
     }
@@ -30,11 +30,11 @@ impl StampingClock {
 main.rs
 ```Rust
 mod worker;
-mod stamping_clock;
-use crate::stamping_clock::StampingClock;
+mod punch_clock;
+use crate::punch_clock::PunchClock;
 
 fn main() {
-    let mut sc=StampingClock::new();
+    let mut sc=PunchClock::new();
     sc.stamp(10);
     println!("Totally stamped {}",sc.total());
 }
@@ -48,21 +48,21 @@ Ok - since we only want one worker, this shouldn't be too hard, should it?
 So we start out with high spirit:
 _worker.rs_
 ```Rust
-use crate::stamping_clock::StampingClock;
+use crate::punch_clock::PunchClock;
 
 pub struct Worker {
-    pub stamping_clock: StampingClock,
+    pub punch_clock: PunchClock,
 }
 
 impl Worker {
-    pub fn new(stamping_clock: StampingClock) -> Worker {
+    pub fn new(punch_clock: PunchClock) -> Worker {
         Worker {
-            stamping_clock: stamping_clock
+            punch_clock
         }
     }
 
     pub fn stamp(&mut self, hours :u32) {
-        self.stamping_clock.stamp(hours);
+        self.punch_clock.stamp(hours);
     }
 }
 ```
@@ -71,12 +71,12 @@ It looks fine - no warnings or compiler errors.
 Then we need to change main.rs to this:
 ```Rust
 mod worker;
-mod stamping_clock;
-use crate::stamping_clock::StampingClock;
+mod punch_clock;
+use crate::punch_clock::PunchClock;
 use crate::worker::Worker;
 
 fn main() {
-    let sc=StampingClock::new();
+    let sc=PunchClock::new();
     let mut w1=Worker::new(sc);
     w1.stamp(10);
     w1.stamp(5);
@@ -89,24 +89,24 @@ This code crashes because the extraction of the total from sc is not valid, sinc
     let mut w1=Worker::new(sc);
 ```
 #### Ok, let's try to borrow the sc to the worker
-We change the types of the StampingClocks variables to support borrowing:
+We change the types of the PunchClocks variables to support borrowing:
 worker.rs:
 ```Rust
-use crate::stamping_clock::StampingClock;
+use crate::punch_clock::PunchClock;
 
 pub struct Worker {
-    pub stamping_clock: &StampingClock,
+    pub punch_clock: &PunchClock,
 }
 
 impl Worker {
-    pub fn new(stamping_clock: &StampingClock) -> Worker {
+    pub fn new(punch_clock: &PunchClock) -> Worker {
         Worker {
-            stamping_clock: stamping_clock
+            punch_clock
         }
     }
 
     pub fn stamp(&mut self, hours :u32) {
-        self.stamping_clock.stamp(hours);
+        self.punch_clock.stamp(hours);
     }
 }
 ```
@@ -115,12 +115,12 @@ Here we get a message indicating that the lifetime has to be specified (with a h
 Main.rs now looks like this (note the &sc)
 ```Rust
 mod worker;
-mod stamping_clock;
-use crate::stamping_clock::StampingClock;
+mod punch_clock;
+use crate::punch_clock::PunchClock;
 use crate::worker::Worker;
 
 fn main() {
-    let sc=StampingClock::new();
+    let sc=PunchClock::new();
     let mut w1=Worker::new(&sc);
     w1.stamp(10);
     w1.stamp(5);
@@ -134,21 +134,21 @@ But the worker does not compile - no lifetime...
 #### Ok - let's add the _'static_ lifetime
 Worker.rs changed to this:
 ```Rust
-use crate::stamping_clock::StampingClock;
+use crate::punch_clock::PunchClock;
 
 pub struct Worker {
-    pub stamping_clock: &'static mut StampingClock,
+    pub punch_clock: &'static mut PunchClock,
 }
 
 impl Worker {
-    pub fn new(stamping_clock: &'static mut StampingClock) -> Worker {
+    pub fn new(punch_clock: &'static mut PunchClock) -> Worker {
         Worker {
-            stamping_clock: stamping_clock
+            punch_clock
         }
     }
 
     pub fn stamp(&mut self, hours :u32) {
-        self.stamping_clock.stamp(hours);
+        self.punch_clock.stamp(hours);
     }
 }
 ```
@@ -157,41 +157,41 @@ This compiles - note the **'static** and **mut** - now we borrow a value with st
 Next, the main.rs ... optimistic still?
 ```Rust
 mod worker;
-mod stamping_clock;
-use crate::stamping_clock::StampingClock;
+mod punch_clock;
+use crate::punch_clock::PunchClock;
 use crate::worker::Worker;
-static mut SC :StampingClock = StampingClock::new();
+static mut PC :PunchClock = PunchClock::new();
 
 fn main() {
-    let mut w1=Worker::new(&mut SC);
+    let mut w1=Worker::new(&mut PC);
     w1.stamp(10);
     w1.stamp(5);
 
-    println!("Totally stamped {}",SC.total());
+    println!("Totally stamped {}",PC.total());
 }
 ```
 Of course this fails miserably. It was obvious that the SC had to be moved out to be a static variable, also we need to pass it in as a mutable borrow, according to the new signature of the worker.
 
 Here we get the message more or less that everything we do is unsafe - and we need to put it into an "unsafe { }"-block - and it sort of feels like we are not really moving along the right path.
 
-Also, we are not allowed to new up the clock like that. Since the StampingClock is really simple at the moment we can skip the new() and create it ourselves changing the line to this:
+Also, we are not allowed to new up the clock like that. Since the PunchClock is really simple at the moment we can skip the new() and create it ourselves changing the line to this:
 ```Rust
-static mut SC :StampingClock = StampingClock { total: 0};
+static mut SC :PunchClock = PunchClock { total: 0};
 ```
-We also have to make the _total_-field public - so we violate the whole StampingClock-struct by making its internal field public, and re-implementing the new()-method in the static-declaration.
+We also have to make the _total_-field public - so we violate the whole PunchClock-struct by making its internal field public, and re-implementing the new()-method in the static-declaration.
 
 We add in a second worker, so the main.rs looks like this:
 ```Rust
 mod worker;
-mod stamping_clock;
-use crate::stamping_clock::StampingClock;
+mod punch_clock;
+use crate::punch_clock::PunchClock;
 use crate::worker::Worker;
-static mut SC :StampingClock = StampingClock { total: 0};
+static mut PC :PunchClock = PunchClock { total: 0};
 
 fn main() {
     unsafe {
-        let mut w1=Worker::new(&mut SC);
-        let mut w2=Worker::new(&mut SC);
+        let mut w1=Worker::new(&mut PC);
+        let mut w2=Worker::new(&mut PC);
         w1.stamp(10);
         w1.stamp(5);
         w2.stamp(10);
@@ -210,21 +210,21 @@ Adding a bit decency back - but still totally unsafe these are the three files (
 main.rs
 ```Rust
 mod worker;
-mod stamping_clock;
-use crate::stamping_clock::StampingClock;
+mod punch_clock;
+use crate::punch_clock::PunchClock;
 use crate::worker::Worker;
-static mut SC :Option<StampingClock> = None;
+static mut PC :Option<PunchClock> = None;
 
 fn main() {
     unsafe {
-        SC=Some(StampingClock::new());
-        let mut w1=Worker::new(&mut SC);
-        let mut w2=Worker::new(&mut SC);
+        PC=Some(PunchClock::new());
+        let mut w1=Worker::new(&mut PC);
+        let mut w2=Worker::new(&mut PC);
         w1.stamp(10);
         w1.stamp(5);
         w2.stamp(10);
-        match &SC {
-            Some(sc) => println!("Totally stamped {}",sc.total()),
+        match &PC {
+            Some(pc) => println!("Totally stamped {}",pc.total()),
             None => ()
         }
     }
@@ -233,37 +233,37 @@ fn main() {
 
 worker.rs
 ```Rust
-use crate::stamping_clock::StampingClock;
+use crate::punch_clock::PunchClock;
 
 pub struct Worker {
-    pub stamping_clock: &'static mut Option<StampingClock>,
+    pub punch_clock: &'static mut Option<PunchClock>,
 }
 
 impl Worker {
-    pub fn new(stamping_clock: &'static mut Option<StampingClock>) -> Worker {
+    pub fn new(punch_clock: &'static mut Option<PunchClock>) -> Worker {
         Worker {
-            stamping_clock: stamping_clock
+            punch_clock
         }
     }
 
     pub fn stamp(&mut self, hours :u32) {
-        match self.stamping_clock {
-            Some(sc) => sc.stamp(hours),
+        match self.punch_clock {
+            Some(pc) => pc.stamp(hours),
             None => ()
         }
     }
 }
 ```
 
-and stamping_clock.rs
+and punch_clock.rs
 ```Rust
-pub struct StampingClock {
+pub struct PunchClock {
     total :u32
 }
 
-impl StampingClock {
-    pub fn new() -> StampingClock {
-        StampingClock {
+impl PunchClock {
+    pub fn new() -> PunchClock {
+        PunchClock {
             total: 0
         }
     }

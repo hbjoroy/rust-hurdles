@@ -1,10 +1,10 @@
-pub struct StampingClock {
+pub struct PunchClock {
     total :u32
 }
 
-impl StampingClock {
-    pub fn new() -> StampingClock {
-        StampingClock {
+impl PunchClock {
+    pub fn new() -> PunchClock {
+        PunchClock {
             total: 0
         }
     }
