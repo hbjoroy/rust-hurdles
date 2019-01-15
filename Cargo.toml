@@ -1,0 +1,7 @@
+[package]
+name = "rustwin"
+version = "0.1.0"
+authors = ["c625hb6"]
+edition = "2018"
+
+[dependencies]
